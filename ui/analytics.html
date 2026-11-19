@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analytics — Fraud Detection</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-2: #111c33;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #4f46e5;
+      --green: #15803d;
+      --red: #b91c1c;
+      --amber: #b45309;
+      --chip-bg: #eef2ff;
+      --shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1220;
+        --bg-2: #0f172a;
+        --panel: #111c33;
+        --panel-2: #0f172a;
+        --border: #1f2a44;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --chip-bg: #1e293b;
+        --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-2);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: var(--bg); color: #cbd5e1;
+      padding: 1.25rem 1rem; position: sticky; top: 0; height: 100vh;
+    }
+    .brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 1.5rem; }
+    .brand .dot { width: 10px; height: 10px; background: #22d3ee; border-radius: 50%; box-shadow: 0 0 12px #22d3ee; }
+    .nav { display: flex; flex-direction: column; gap: .25rem; }
+    .nav a { color: #cbd5e1; padding: .65rem .8rem; border-radius: 8px; font-size: .95rem; }
+    .nav a:hover { background: rgba(255,255,255,0.05); text-decoration: none; }
+    .nav a.active { background: rgba(99,102,241,0.18); color: #fff; }
+    .main { padding: 1.5rem 2rem; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .topbar h1 { margin: 0; font-size: 1.4rem; }
+    .topbar .meta { color: var(--muted); font-size: .9rem; }
+    .kpis { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1.5rem; }
+    .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; box-shadow: var(--shadow); }
+    .kpi .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+    .kpi .value { font-size: 1.7rem; font-weight: 700; margin-top: .25rem; }
+    .kpi.green .value { color: var(--green); }
+    .kpi.red .value { color: var(--red); }
+    .kpi.amber .value { color: var(--amber); }
+    .kpi.accent .value { color: var(--accent); }
+    .grid-2 { display: grid; gap: 1.25rem; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.4rem; box-shadow: var(--shadow); margin-bottom: 1.25rem; }
+    .card h2 { margin: 0 0 .75rem; font-size: 1.05rem; }
+    .card .hint { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { border-bottom: 1px solid var(--border); padding: .5rem; text-align: left; }
+    th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: .72rem; letter-spacing: .05em; }
+    .bar-row { display: grid; grid-template-columns: 130px 1fr 50px; align-items: center; gap: .5rem; margin: .35rem 0; font-size: .85rem; }
+    .bar { background: var(--accent); height: 14px; border-radius: 3px; min-width: 2px; }
+    .bar.red { background: var(--red); }
+    .bar.amber { background: var(--amber); }
+    .bar.green { background: var(--green); }
+    .empty { color: var(--muted); padding: 1.5rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><span class="dot"></span> FraudOps Console</div>
+      <nav class="nav">
+        <a href="/">📋&nbsp; Alerts</a>
+        <a href="/investigate">🔍&nbsp; Investigate</a>
+        <a href="/analytics" class="active">📊&nbsp; Analytics</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <h1>Analytics & feedback loop</h1>
+        <div class="meta" id="last-updated">Loading…</div>
+      </div>
+
+      <section class="kpis" id="kpis">
+        <div class="kpi"><div class="label">Total alerts</div><div class="value" id="kpi-total">—</div></div>
+        <div class="kpi amber"><div class="label">Pending</div><div class="value" id="kpi-pending">—</div></div>
+        <div class="kpi red"><div class="label">Blocked</div><div class="value" id="kpi-blocked">—</div></div>
+        <div class="kpi green"><div class="label">Approved</div><div class="value" id="kpi-approved">—</div></div>
+        <div class="kpi accent"><div class="label">Reviewer agreement</div><div class="value" id="kpi-agree">—</div></div>
+        <div class="kpi"><div class="label">Reviews logged</div><div class="value" id="kpi-reviews">—</div></div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2>Alerts by status</h2>
+          <div id="status-bars">Loading…</div>
+        </section>
+
+        <section class="card">
+          <h2>Agent recommendations</h2>
+          <div id="rec-bars">Loading…</div>
+        </section>
+
+        <section class="card">
+          <h2>Combined score distribution</h2>
+          <div class="hint">Buckets of 0.1. Heavier on the right = the system flags high-risk cases.</div>
+          <div id="histogram">Loading…</div>
+        </section>
+
+        <section class="card">
+          <h2>Fraud types (from agent)</h2>
+          <div id="fraud-bars">Loading…</div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2>Reviewer ↔ agent agreement</h2>
+        <div class="hint">Higher agreement means the RAG agent is making recommendations reviewers accept. Disagreements feed back into the index.</div>
+        <div id="agreement">Loading…</div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    async function parseResponse(r) {
+      const text = await r.text();
+      if (!r.ok) throw new Error(text || `${r.status} ${r.statusText}`);
+      if (!text) return null;
+      try { return JSON.parse(text); } catch { return text; }
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    function barRow(label, value, max, cls) {
+      const pct = max ? Math.round((value / max) * 100) : 0;
+      return `<div class="bar-row">
+        <div>${escapeHtml(label)}</div>
+        <div style="background:var(--panel-2); border-radius:3px; height:14px;">
+          <div class="bar ${cls || ''}" style="width:${pct}%;"></div>
+        </div>
+        <div style="text-align:right; color: var(--muted);">${value}</div>
+      </div>`;
+    }
+    function renderBars(containerId, counts, cls) {
+      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (!entries.length) {
+        document.getElementById(containerId).innerHTML = '<div class="empty">No data yet.</div>';
+        return;
+      }
+      const max = Math.max(...entries.map(e => e[1]));
+      document.getElementById(containerId).innerHTML = entries
+        .map(([k, v]) => barRow(k, v, max, cls && cls[k])).join('');
+    }
+
+    async function load() {
+      try {
+        const data = await parseResponse(await fetch('/api/analytics/summary'));
+        const total = data.total || 0;
+        const byStatus = data.by_status || {};
+        const byRec = data.by_recommendation || {};
+        const byFraud = data.by_fraud_type || {};
+        const hist = data.score_histogram || [];
+        const rev = data.reviewer || {};
+
+        document.getElementById('kpi-total').textContent = total;
+        document.getElementById('kpi-pending').textContent = byStatus.pending || 0;
+        document.getElementById('kpi-blocked').textContent = byStatus.blocked || 0;
+        document.getElementById('kpi-approved').textContent = byStatus.approved || 0;
+        document.getElementById('kpi-reviews').textContent = rev.total || 0;
+        document.getElementById('kpi-agree').textContent = rev.agreement_rate != null
+          ? `${(rev.agreement_rate * 100).toFixed(0)}%` : '—';
+
+        renderBars('status-bars', byStatus, { pending: 'amber', blocked: 'red', approved: 'green' });
+        renderBars('rec-bars', byRec, { block: 'red', hold: 'amber', approve: 'green' });
+        renderBars('fraud-bars', byFraud, null);
+
+        // Histogram
+        const histEl = document.getElementById('histogram');
+        const max = Math.max(...hist, 1);
+        histEl.innerHTML = hist.map((c, i) => {
+          const lo = (i / 10).toFixed(1);
+          const hi = ((i + 1) / 10).toFixed(1);
+          return barRow(`${lo}-${hi}`, c, max, i >= 7 ? 'red' : i >= 4 ? 'amber' : '');
+        }).join('') || '<div class="empty">No scores yet.</div>';
+
+        const ag = document.getElementById('agreement');
+        if (!rev.total) {
+          ag.innerHTML = '<div class="empty">No reviewer decisions yet. Approve or block alerts from the investigation page to start logging feedback.</div>';
+        } else {
+          ag.innerHTML = `
+            <table>
+              <thead><tr><th>Outcome</th><th>Count</th><th>Share</th></tr></thead>
+              <tbody>
+                <tr><td>Reviewer agreed with agent</td><td>${rev.agree}</td><td>${(rev.agree/rev.total*100).toFixed(0)}%</td></tr>
+                <tr><td>Reviewer overrode agent</td><td>${rev.disagree}</td><td>${(rev.disagree/rev.total*100).toFixed(0)}%</td></tr>
+              </tbody>
+            </table>
+          `;
+        }
+
+        document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        document.getElementById('last-updated').textContent = 'Error: ' + e.message;
+      }
+    }
+    load();
+    setInterval(load, 20000);
+  </script>
+</body>
+</html>

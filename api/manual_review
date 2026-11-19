@@ -1,0 +1,68 @@
+# fraud_detection/api/manual_review.py
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+import sqlalchemy as sa
+from sqlalchemy.orm import sessionmaker
+from fraud_detection.config import load_config
+
+router = APIRouter()
+cfg = load_config()
+
+import os
+pg_host = cfg.get('postgres', {}).get('host', 'localhost')
+if pg_host == 'db':
+    pg_host = 'localhost'
+
+pg_url = (
+    f"postgresql://{cfg.get('postgres', {}).get('user', 'fraud_user')}:{cfg.get('postgres', {}).get('password', 'fraud_pass')}@"
+    f"{pg_host}:{cfg.get('postgres', {}).get('port', 5432)}/{cfg.get('postgres', {}).get('database', 'fraud_db')}"
+)
+
+try:
+    test_engine = sa.create_engine(pg_url, connect_args={"connect_timeout": 2})
+    with test_engine.connect() as conn:
+        conn.execute(sa.text("SELECT 1"))
+    engine = test_engine
+except Exception:
+    sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fraud_db.sqlite")
+    engine = sa.create_engine(f"sqlite:///{sqlite_path}")
+
+Session = sessionmaker(bind=engine)
+
+class DecisionIn(BaseModel):
+    decision: str  # "approve" or "block"
+
+@router.get("/alerts/pending")
+def list_pending():
+    session = Session()
+    try:
+        rows = session.execute(sa.text("SELECT id, transaction_id, combined_score FROM alerts WHERE status='pending'")).fetchall()
+        return [{"id": r.id, "transaction_id": r.transaction_id, "score": r.combined_score} for r in rows]
+    finally:
+        session.close()
+
+@router.post("/alerts/{alert_id}/decision")
+def decide(alert_id: int, body: DecisionIn):
+    session = Session()
+    try:
+        alert = session.execute(sa.text("SELECT * FROM alerts WHERE id=:aid"), {"aid": alert_id}).fetchone()
+        if not alert:
+            raise HTTPException(status_code=404, detail="Alert not found")
+
+        if body.decision == "approve":
+            from fraud_detection.tasks.approve_transaction import approve_transaction
+            approve_transaction({"transaction_id": alert.transaction_id, "user_id": None})  # payload minimal
+            new_status = "approved"
+        elif body.decision == "block":
+            from fraud_detection.tasks.block_account import block_account
+            block_account({"transaction_id": alert.transaction_id, "user_id": None})
+            new_status = "blocked"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid decision")
+
+        session.execute(sa.text("UPDATE alerts SET status=:st WHERE id=:aid"),
+                        {"st": new_status, "aid": alert_id})
+        session.commit()
+        return {"status": new_status}
+    finally:
+        session.close()

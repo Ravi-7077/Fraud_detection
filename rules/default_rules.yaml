@@ -1,0 +1,12 @@
+- field: amount
+  operator: ">"
+  value: 1000
+  score: 0.25
+- field: device_risk_score
+  operator: ">"
+  value: 0.8
+  score: 0.25
+- field: ip_risk_score
+  operator: ">"
+  value: 0.8
+  score: 0.25

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fraud Review Dashboard</title>
+<style>
+  body {font-family: Arial, sans-serif; margin: 2rem;}
+  table {width: 100%; border-collapse: collapse;}
+  th, td {border: 1px solid #ccc; padding: 0.5rem; text-align: left;}
+  button {margin-right: 0.5rem;}
+</style>
+</head>
+<body>
+<h1>Pending Fraud Alerts</h1>
+<table id="alerts-table">
+  <thead><tr><th>ID</th><th>Transaction</th><th>Score</th><th>Actions</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+async function loadAlerts() {
+  const resp = await fetch('/api/alerts/pending');
+  const alerts = await resp.json();
+  const tbody = document.querySelector('#alerts-table tbody');
+  tbody.innerHTML = '';
+  alerts.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${a.id}</td>
+      <td>${a.transaction_id}</td>
+      <td>${a.score.toFixed(3)}</td>
+      <td>
+        <button onclick="decide(${a.id},'approve')">Approve</button>
+        <button onclick="decide(${a.id},'block')">Block</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+async function decide(id, decision) {
+  await fetch(`/api/alerts/${id}/decision`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({decision})
+  });
+  loadAlerts();
+}
+loadAlerts();
+</script>
+</body>
+</html>

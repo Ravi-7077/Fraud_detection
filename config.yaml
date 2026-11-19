@@ -1,0 +1,38 @@
+# config.yaml
+
+# Connection settings (override with environment variables if needed)
+redis_url: redis://localhost:6379/0
+postgres:
+  host: db
+  port: 5432
+  database: fraud_db
+  user: fraud_user
+  password: fraud_pass
+
+# Pipeline thresholds
+risk_score_threshold: 0.5  # lowered for higher sensitivity
+
+# Feature toggles
+enable_manual_review: true
+
+# Email alert settings (use environment vars for secrets)
+email:
+  smtp_host: ${SMTP_HOST}
+  smtp_port: ${SMTP_PORT}
+  smtp_user: ${SMTP_USER}
+  smtp_password: ${SMTP_PASSWORD}
+  from_addr: ${EMAIL_FROM}
+  to_addrs: ${ALERT_RECIPIENTS}  # comma separated list
+
+# Dashboard endpoint (internal UI)
+dashboard_url: http://localhost:8000/dashboard
+
+# NeMo-style RAG investigation agent
+agent:
+  enabled: true
+  # 'stub' returns deterministic recommendations without burning API credits.
+  # 'openai' or 'anthropic' require LLM_API_KEY in the environment.
+  provider: ${LLM_PROVIDER:stub}
+  model: ${LLM_MODEL:}
+  # Top-k context documents to retrieve per investigation
+  retrieval_top_k: 5

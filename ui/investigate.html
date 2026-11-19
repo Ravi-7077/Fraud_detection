@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Investigation — Fraud Detection</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-2: #111c33;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #4f46e5;
+      --accent-2: #6366f1;
+      --green: #15803d;
+      --red: #b91c1c;
+      --amber: #b45309;
+      --slate: #475569;
+      --chip-bg: #eef2ff;
+      --shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1220;
+        --bg-2: #0f172a;
+        --panel: #111c33;
+        --panel-2: #0f172a;
+        --border: #1f2a44;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --chip-bg: #1e293b;
+        --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-2);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: var(--bg); color: #cbd5e1;
+      padding: 1.25rem 1rem; position: sticky; top: 0; height: 100vh;
+    }
+    .brand {
+      display: flex; align-items: center; gap: .5rem;
+      font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 1.5rem;
+    }
+    .brand .dot { width: 10px; height: 10px; background: #22d3ee; border-radius: 50%; box-shadow: 0 0 12px #22d3ee; }
+    .nav { display: flex; flex-direction: column; gap: .25rem; }
+    .nav a { color: #cbd5e1; padding: .65rem .8rem; border-radius: 8px; font-size: .95rem; }
+    .nav a:hover { background: rgba(255,255,255,0.05); text-decoration: none; }
+    .nav a.active { background: rgba(99,102,241,0.18); color: #fff; }
+    .main { padding: 1.5rem 2rem; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; gap: 1rem; }
+    .topbar h1 { margin: 0; font-size: 1.4rem; }
+    .topbar .crumbs { color: var(--muted); font-size: .85rem; }
+    .grid-2 { display: grid; gap: 1.25rem; grid-template-columns: 1.4fr 1fr; }
+    @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.4rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.25rem;
+    }
+    .card h2 { margin: 0 0 .75rem; font-size: 1.05rem; }
+    .card .hint { color: var(--muted); font-size: .85rem; margin-bottom: 1rem; }
+    .kv { display: grid; grid-template-columns: max-content 1fr; gap: .35rem .9rem; font-size: .9rem; }
+    .kv .k { color: var(--muted); }
+    .kv .v { font-weight: 500; }
+    .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; }
+    .score-tile {
+      border: 1px solid var(--border); border-radius: 10px; padding: .8rem;
+      background: var(--panel-2);
+    }
+    .score-tile .label { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+    .score-tile .value { font-size: 1.4rem; font-weight: 700; margin-top: .15rem; }
+    .chip { display: inline-block; padding: .15rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--chip-bg); color: var(--accent); }
+    .chip.pending { background: #fef3c7; color: var(--amber); }
+    .chip.approved { background: #dcfce7; color: var(--green); }
+    .chip.blocked { background: #fee2e2; color: var(--red); }
+    .chip.recommendation-block { background: #fee2e2; color: var(--red); }
+    .chip.recommendation-hold { background: #fef3c7; color: var(--amber); }
+    .chip.recommendation-approve { background: #dcfce7; color: var(--green); }
+    .evidence-list { display: flex; flex-direction: column; gap: .35rem; padding: 0; list-style: none; margin: .5rem 0 0; }
+    .evidence-list li {
+      border-left: 3px solid var(--accent);
+      background: var(--panel-2);
+      padding: .45rem .7rem; border-radius: 6px;
+      font-size: .88rem;
+    }
+    .context-list { font-size: .82rem; color: var(--muted); padding: 0; list-style: none; margin: .5rem 0 0; }
+    .context-list li { padding: .25rem 0; border-bottom: 1px solid var(--border); }
+    .context-list li:last-child { border-bottom: none; }
+    label { display: block; margin-bottom: .4rem; font-weight: 600; font-size: .85rem; }
+    textarea, input {
+      width: 100%; padding: .6rem .75rem;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--panel-2); color: var(--text); font: inherit;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      color: #fff; border: none; padding: .65rem 1.1rem;
+      border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600;
+    }
+    button:hover { filter: brightness(1.05); }
+    button.success { background: #15803d; }
+    button.danger { background: #dc2626; }
+    button.secondary { background: var(--slate); }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .chat {
+      max-height: 320px; overflow-y: auto;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: .75rem; background: var(--panel-2);
+      display: flex; flex-direction: column; gap: .5rem;
+    }
+    .msg { padding: .5rem .7rem; border-radius: 8px; font-size: .9rem; max-width: 85%; }
+    .msg.user { background: var(--accent); color: #fff; align-self: flex-end; }
+    .msg.agent { background: var(--panel); border: 1px solid var(--border); }
+    .empty { color: var(--muted); padding: 1.5rem; text-align: center; }
+    .toast {
+      position: fixed; right: 1.5rem; bottom: 1.5rem;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-left: 4px solid var(--accent);
+      padding: .8rem 1rem; border-radius: 8px; box-shadow: var(--shadow);
+      display: none; max-width: 360px;
+    }
+    .toast.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><span class="dot"></span> FraudOps Console</div>
+      <nav class="nav">
+        <a href="/">📋&nbsp; Alerts</a>
+        <a href="/investigate" class="active">🔍&nbsp; Investigate</a>
+        <a href="/analytics">📊&nbsp; Analytics</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <div class="crumbs"><a href="/">Alerts</a> › Investigation</div>
+          <h1 id="page-title">Investigation</h1>
+        </div>
+        <div id="status-chip"></div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <section class="card">
+            <h2>Transaction</h2>
+            <div class="hint" id="tx-meta">Loading…</div>
+            <div class="kv" id="tx-kv"></div>
+          </section>
+
+          <section class="card">
+            <h2>Score breakdown</h2>
+            <div class="score-grid" id="score-grid"></div>
+          </section>
+
+          <section class="card">
+            <h2>Human decision (override or confirm)</h2>
+            <div class="hint">The agent recommends a path. You make the final call. Your decision is recorded for the RAG knowledge base.</div>
+            <div class="actions" style="margin-bottom: .75rem;">
+              <button class="success" onclick="decide('approve', 'agree')">✓ Approve (confirm agent)</button>
+              <button class="danger" onclick="decide('block', 'agree')">⛔ Block (confirm agent)</button>
+              <button class="secondary" onclick="decide('override_approve', 'override_block')">Override → Approve</button>
+              <button class="ghost" onclick="decide('override_block', 'override_approve')">Override → Block</button>
+            </div>
+            <label for="notes">Reviewer notes (optional)</label>
+            <textarea id="notes" placeholder="Why are you agreeing or overriding? Notes feed back into the RAG index."></textarea>
+          </section>
+        </div>
+
+        <div>
+          <section class="card">
+            <h2>NeMo RAG investigation</h2>
+            <div class="hint">The agent retrieved playbooks and similar past cases, then reasoned about this transaction.</div>
+            <div id="agent-panel">Loading investigation…</div>
+          </section>
+
+          <section class="card">
+            <h2>Ask the agent</h2>
+            <div class="hint">Follow-up questions about this case.</div>
+            <div class="chat" id="chat"></div>
+            <div style="display:flex; gap:.5rem; margin-top:.5rem;">
+              <input id="followup-input" type="text" placeholder="e.g. What evidence is driving the high device risk?" />
+              <button onclick="askFollowup()">Ask</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ALERT_ID = new URLSearchParams(window.location.search).get('id');
+    if (!ALERT_ID) {
+      document.querySelector('main').innerHTML = '<div class="card"><h2>No alert id provided</h2><p>Open this page from the <a href="/">alerts list</a>.</p></div>';
+    }
+
+    async function parseResponse(response) {
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || `${response.status} ${response.statusText}`);
+      if (!text) return null;
+      try { return JSON.parse(text); } catch { return text; }
+    }
+    function toast(msg, kind) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.borderLeftColor = kind === 'error' ? '#dc2626' : kind === 'success' ? '#15803d' : '#4f46e5';
+      el.classList.add('show');
+      clearTimeout(window._toastT);
+      window._toastT = setTimeout(() => el.classList.remove('show'), 3500);
+    }
+    function fmtScore(x) { return Number(x || 0).toFixed(3); }
+
+    async function loadAlert() {
+      try {
+        const alert = await parseResponse(await fetch(`/api/alerts/${ALERT_ID}`));
+        document.getElementById('page-title').textContent = `Alert #${alert.id} — Transaction ${alert.transaction_id}`;
+        document.getElementById('status-chip').innerHTML = `<span class="chip ${alert.status}">${alert.status}</span>`;
+        document.getElementById('tx-meta').textContent = `Created ${new Date(alert.created_at).toLocaleString()}`;
+        const kv = [
+          ['Transaction ID', alert.transaction_id],
+          ['Status', `<span class="chip ${alert.status}">${alert.status}</span>`],
+        ];
+        document.getElementById('tx-kv').innerHTML = kv.map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join('');
+
+        const sg = document.getElementById('score-grid');
+        sg.innerHTML = [
+          tile('Rule score', fmtScore(alert.risk_score ? alert.risk_score * 0.6 : 0)),
+          tile('Risk score', fmtScore(alert.risk_score)),
+          tile('ML score', fmtScore(alert.ml_score)),
+          tile('Combined', fmtScore(alert.combined_score), true),
+        ].join('');
+      } catch (e) {
+        document.getElementById('tx-meta').textContent = 'Error: ' + e.message;
+      }
+    }
+    function tile(label, value, big) {
+      return `<div class="score-tile"><div class="label">${label}</div><div class="value" style="${big ? 'color:var(--accent);' : ''}">${value}</div></div>`;
+    }
+
+    async function loadInvestigation() {
+      const panel = document.getElementById('agent-panel');
+      try {
+        const data = await parseResponse(await fetch(`/api/alerts/${ALERT_ID}/investigation`));
+        const inv = data.investigation || {};
+        const rec = inv.recommendation || '—';
+        const conf = inv.confidence != null ? Number(inv.confidence).toFixed(2) : '—';
+        const evidence = (inv.evidence || []).map(e => `<li>${escapeHtml(e)}</li>`).join('') || '<li class="empty">No evidence chips</li>';
+        const ctx = (inv.retrieved_context || []).map(c => `<li>${escapeHtml(c.title)} <span class="chip">${escapeHtml(c.kind || '')}</span> <span style="float:right">${(c.score || 0).toFixed(2)}</span></li>`).join('');
+        const fraudType = inv.fraud_type ? `<span class="chip">${escapeHtml(inv.fraud_type)}</span>` : '';
+        const action = inv.suggested_action ? `<div style="margin-top:.5rem;"><strong>Next step:</strong> ${escapeHtml(inv.suggested_action)}</div>` : '';
+        const model = inv.model_used ? `<div class="hint" style="margin-top:.5rem;">Reasoned by <code>${escapeHtml(inv.model_used)}</code>${data.from_cache ? ' · cached' : ' · live'}</div>` : '';
+        panel.innerHTML = `
+          <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.5rem;">
+            <span class="chip recommendation-${rec}">${escapeHtml(String(rec).toUpperCase())}</span>
+            <span class="hint">Confidence: <strong>${conf}</strong></span>
+            ${fraudType}
+          </div>
+          <div>${escapeHtml(inv.summary || 'No summary available.')}</div>
+          ${action}
+          <h3 style="margin:1rem 0 .25rem; font-size:.95rem;">Evidence</h3>
+          <ul class="evidence-list">${evidence}</ul>
+          <h3 style="margin:1rem 0 .25rem; font-size:.95rem;">Retrieved context</h3>
+          <ul class="context-list">${ctx || '<li class="empty">No context retrieved.</li>'}</ul>
+          ${model}
+        `;
+      } catch (e) {
+        panel.innerHTML = `<div class="empty">Investigation failed: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function decide(decision, reviewerDecision) {
+      const notes = document.getElementById('notes').value;
+      try {
+        await parseResponse(await fetch(`/api/alerts/${ALERT_ID}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, notes })
+        }));
+        toast(`Recorded: ${decision} (${reviewerDecision})`, 'success');
+        loadAlert();
+      } catch (e) {
+        toast('Error: ' + e.message, 'error');
+      }
+    }
+
+    async function askFollowup() {
+      const input = document.getElementById('followup-input');
+      const q = input.value.trim();
+      if (!q) return;
+      const chat = document.getElementById('chat');
+      chat.insertAdjacentHTML('beforeend', `<div class="msg user">${escapeHtml(q)}</div>`);
+      input.value = '';
+      chat.insertAdjacentHTML('beforeend', `<div class="msg agent"><em>Thinking…</em></div>`);
+      chat.scrollTop = chat.scrollHeight;
+      const placeholder = chat.lastElementChild;
+      try {
+        const r = await parseResponse(await fetch(`/api/alerts/${ALERT_ID}/followup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: q })
+        }));
+        placeholder.outerHTML = `<div class="msg agent">${escapeHtml(r.answer || 'No answer.')}</div>`;
+      } catch (e) {
+        placeholder.outerHTML = `<div class="msg agent">Error: ${escapeHtml(e.message)}</div>`;
+      }
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && document.activeElement.id === 'followup-input') askFollowup();
+    });
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    if (ALERT_ID) {
+      loadAlert();
+      loadInvestigation();
+    }
+  </script>
+</body>
+</html>
